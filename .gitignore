@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+.vs/
+.idea/
+*.user
+*.suo
+publish/
+# Secrets / local environment files
+.env
+.env.*
+**/appsettings.*.Local.json
+**/secrets.json

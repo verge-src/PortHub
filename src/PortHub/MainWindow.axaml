@@ -1,0 +1,872 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:chrome="using:Avalonia.Controls.Chrome"
+        x:Class="PortHub.MainWindow"
+        Title="PortHub"
+        Width="1240" Height="780"
+        MinWidth="880" MinHeight="540"
+        CanResize="True"
+        WindowStartupLocation="CenterScreen"
+        WindowDecorations="None"
+        ExtendClientAreaToDecorationsHint="True"
+        TransparencyLevelHint="AcrylicBlur,Blur,Transparent"
+        TransparencyBackgroundFallback="#25203A"
+        Background="Transparent">
+
+  <Window.Styles>
+    <!-- Avalonia 12 custom window decorations can cover acrylic with a tinted underlay.
+         Keep its two implicit decoration surfaces transparent (issue #21082). -->
+    <Style Selector="WindowDrawnDecorations /template/ Border#PART_WindowBorder">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="WindowDrawnDecorations /template/ Panel#PART_TitleBar">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+
+    <!-- Three quiet caption controls, no bar, no highlight in idle state. -->
+    <Style Selector="Button.chrome-button">
+      <Setter Property="Width" Value="32" />
+      <Setter Property="Height" Value="25" />
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Foreground" Value="#ADB9CF" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.chrome-button:pointerover">
+      <Setter Property="Background" Value="#304D5B7A" />
+      <Setter Property="Foreground" Value="#F3F5FC" />
+    </Style>
+    <Style Selector="Button.chrome-button:pressed">
+      <Setter Property="Background" Value="#60525D7C" />
+    </Style>
+    <Style Selector="Button.close-button:pointerover">
+      <Setter Property="Background" Value="#B4A13B50" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+
+    <!-- Sidebar navigation. Only the sidebar content is new in v0.1.5. -->
+    <Style Selector="Button.side-nav">
+      <Setter Property="Height" Value="46" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="14,0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="11" />
+      <Setter Property="Foreground" Value="#C3C3D7" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontWeight" Value="Medium" />
+    </Style>
+    <Style Selector="Button.side-nav:pointerover">
+      <Setter Property="Background" Value="#354C426B" />
+      <Setter Property="Foreground" Value="#F3F1FF" />
+    </Style>
+    <Style Selector="Button.side-nav:pressed">
+      <Setter Property="Background" Value="#62453F7C" />
+    </Style>
+    <Style Selector="Button.side-nav.active">
+      <Setter Property="Background" Value="#6F5650A6" />
+      <Setter Property="Foreground" Value="#E5E0FF" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.side-nav.active:pointerover">
+      <Setter Property="Background" Value="#855C58AD" />
+      <Setter Property="Foreground" Value="#FFFFFF" />
+    </Style>
+    <!-- New Home controls: semi-transparent cards over the SAME glass tint. -->
+    <Style Selector="Border.search-box">
+      <Setter Property="Background" Value="#5B1B1B30" />
+      <Setter Property="BorderBrush" Value="#554C4965" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="10" />
+    </Style>
+    <Style Selector="TextBox.flat-search">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="#F4F0FC" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="TextBox.flat-search:focus">
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Border.key-chip">
+      <Setter Property="Background" Value="#653C3A50" />
+      <Setter Property="BorderBrush" Value="#504C4863" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="5,1" />
+    </Style>
+    <Style Selector="Button.top-icon">
+      <Setter Property="Width" Value="38" />
+      <Setter Property="Height" Value="38" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush" Value="#5C4F4A68" />
+      <Setter Property="Background" Value="#6A202039" />
+    </Style>
+    <Style Selector="Button.top-icon:pointerover">
+      <Setter Property="Background" Value="#8D3D3459" />
+    </Style>
+    <Style Selector="Button.primary-action">
+      <Setter Property="Background" Value="#9181F4" />
+      <Setter Property="Foreground" Value="#FFFFFF" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="13,9" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="Button.primary-action:pointerover">
+      <Setter Property="Background" Value="#AB9DFF" />
+    </Style>
+    <Style Selector="Button.secondary-action">
+      <Setter Property="Background" Value="#3D2D2849" />
+      <Setter Property="Foreground" Value="#EEE9FF" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush" Value="#827D77A9" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Padding" Value="13,9" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="Button.secondary-action:pointerover">
+      <Setter Property="Background" Value="#723C3267" />
+    </Style>
+    <Style Selector="Border.glass-card">
+      <Setter Property="Background" Value="#65201D34" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush" Value="#554E4A68" />
+      <Setter Property="CornerRadius" Value="13" />
+    </Style>
+    <Style Selector="Border.app-card">
+      <Setter Property="Background" Value="#741A1A30" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush" Value="#554A465E" />
+      <Setter Property="CornerRadius" Value="14" />
+    </Style>
+    <Style Selector="Button.card-action">
+      <Setter Property="Background" Value="#644C4278" />
+      <Setter Property="Foreground" Value="#E8E2FC" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="9,6" />
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="Button.card-action:pointerover">
+      <Setter Property="Background" Value="#946C62AE" />
+    </Style>
+    <Style Selector="Button.text-action">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="#BAB0FF" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="4,2" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+    <Style Selector="Button.text-action:pointerover">
+      <Setter Property="Foreground" Value="#F0EBFF" />
+    </Style>
+  </Window.Styles>
+
+  <!-- Do NOT paint the root with an almost opaque gradient: it hides AcrylicBlur.
+       Keep a transparent, rounded clipping surface with a dedicated glass layer. -->
+  <Grid Background="Transparent">
+    <Border x:Name="WindowSurface"
+            Background="Transparent"
+            CornerRadius="18"
+            ClipToBounds="True"
+            BorderThickness="0">
+      <Grid Background="Transparent">
+        <!-- Real acrylic remains responsible for the blur. A saturated graphite-violet
+             tint brings back the original PortHub palette without making it opaque. -->
+        <ExperimentalAcrylicBorder x:Name="GlassLayer"
+                                   CornerRadius="18"
+                                   IsHitTestVisible="False">
+          <ExperimentalAcrylicBorder.Material>
+            <ExperimentalAcrylicMaterial BackgroundSource="Digger"
+                                         TintColor="#29203F"
+                                         TintOpacity="0.94"
+                                         MaterialOpacity="0.66"
+                                         FallbackColor="#25203B" />
+          </ExperimentalAcrylicBorder.Material>
+        </ExperimentalAcrylicBorder>
+
+        <Grid ColumnDefinitions="246,*" Background="Transparent">
+          <!-- Left glass panel: noticeably deeper charcoal-violet, still translucent. -->
+          <Border x:Name="SidebarSurface"
+                  Grid.Column="0"
+                  Background="#76161529"
+                  BorderBrush="#264A455F"
+                  BorderThickness="0,0,1,0">
+            <!-- Brand and nav, with plenty of clean space beneath. -->
+            <StackPanel Margin="16,55,16,0">
+              <StackPanel Orientation="Horizontal"
+                          VerticalAlignment="Center"
+                          Spacing="12"
+                          Margin="11,0,0,36">
+                <Canvas Width="34" Height="34" VerticalAlignment="Center">
+                  <Path Data="M 17 3 L 30 10.5 L 17 18 L 4 10.5 Z"
+                        Fill="#B7AEFF" />
+                  <Path Data="M 4 17 L 17 24 L 30 17"
+                        Stroke="#8D82FF" StrokeThickness="3.4"
+                        StrokeLineCap="Round" StrokeJoin="Round" />
+                  <Path Data="M 4 23 L 17 30 L 30 23"
+                        Stroke="#706CF0" StrokeThickness="3.4"
+                        StrokeLineCap="Round" StrokeJoin="Round" />
+                </Canvas>
+                <TextBlock Text="PortHub"
+                           FontSize="21"
+                           FontWeight="Bold"
+                           Foreground="#F2F0FA"
+                           VerticalAlignment="Center" />
+              </StackPanel>
+              <StackPanel Spacing="5">
+                <Button x:Name="HomeNavButton"
+                        Classes="side-nav active"
+                        Click="Navigation_Click"
+                        ToolTip.Tip="Главная">
+                  <StackPanel Orientation="Horizontal" Spacing="13" VerticalAlignment="Center">
+                    <Path Width="20" Height="20"
+                          Stretch="Uniform"
+                          Fill="Transparent"
+                          Data="M 2.5 9 L 10 2.8 L 17.5 9 L 17.5 17.5 L 11.9 17.5 L 11.9 12.5 L 8.1 12.5 L 8.1 17.5 L 2.5 17.5 Z"
+                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                          StrokeThickness="1.6"
+                          StrokeLineCap="Round"
+                          StrokeJoin="Round"
+                          VerticalAlignment="Center" />
+                    <TextBlock Text="Главная" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+                <Button x:Name="LibraryNavButton"
+                        Classes="side-nav"
+                        Click="Navigation_Click"
+                        ToolTip.Tip="Библиотека">
+                  <StackPanel Orientation="Horizontal" Spacing="13" VerticalAlignment="Center">
+                    <Path Width="20" Height="20"
+                          Stretch="Uniform"
+                          Fill="Transparent"
+                          Data="M 10 2.4 L 18 6.5 L 10 10.7 L 2 6.5 Z M 2 10.2 L 10 14.5 L 18 10.2 M 2 13.8 L 10 18 L 18 13.8"
+                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                          StrokeThickness="1.6"
+                          StrokeLineCap="Round"
+                          StrokeJoin="Round"
+                          VerticalAlignment="Center" />
+                    <TextBlock Text="Библиотека" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+                <Button x:Name="DownloadsNavButton"
+                        Classes="side-nav"
+                        Click="Navigation_Click"
+                        ToolTip.Tip="Загрузки">
+                  <StackPanel Orientation="Horizontal" Spacing="13" VerticalAlignment="Center">
+                    <Path Width="20" Height="20"
+                          Stretch="Uniform"
+                          Fill="Transparent"
+                          Data="M 10 2.5 L 10 13.6 M 6 9.6 L 10 13.6 L 14 9.6 M 3 15 L 3 18 L 17 18 L 17 15"
+                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                          StrokeThickness="1.6"
+                          StrokeLineCap="Round"
+                          StrokeJoin="Round"
+                          VerticalAlignment="Center" />
+                    <TextBlock Text="Загрузки" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+                <Button x:Name="UpdatesNavButton"
+                        Classes="side-nav"
+                        Click="Navigation_Click"
+                        ToolTip.Tip="Обновления">
+                  <StackPanel Orientation="Horizontal" Spacing="13" VerticalAlignment="Center">
+                    <Path Width="20" Height="20"
+                          Stretch="Uniform"
+                          Fill="Transparent"
+                          Data="M 17.3 7.3 A 7.5 7.5 0 0 0 3 7 L 3 3.5 M 3 7 L 6.7 7 M 2.7 12.7 A 7.5 7.5 0 0 0 17 13 L 17 16.5 M 17 13 L 13.3 13"
+                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                          StrokeThickness="1.6"
+                          StrokeLineCap="Round"
+                          StrokeJoin="Round"
+                          VerticalAlignment="Center" />
+                    <TextBlock Text="Обновления" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+                <Button x:Name="SettingsNavButton"
+                        Classes="side-nav"
+                        Click="Navigation_Click"
+                        ToolTip.Tip="Настройки">
+                  <StackPanel Orientation="Horizontal" Spacing="13" VerticalAlignment="Center">
+                    <Path Width="20" Height="20"
+                          Stretch="Uniform"
+                          Fill="Transparent"
+                          Data="M 8 2 L 12 2 L 12.6 4.2 L 14.3 4.9 L 16.4 3.8 L 18.5 7.2 L 16.9 8.9 L 16.9 11.1 L 18.5 12.8 L 16.4 16.2 L 14.3 15.1 L 12.6 15.8 L 12 18 L 8 18 L 7.4 15.8 L 5.7 15.1 L 3.6 16.2 L 1.5 12.8 L 3.1 11.1 L 3.1 8.9 L 1.5 7.2 L 3.6 3.8 L 5.7 4.9 L 7.4 4.2 Z M 13 10 A 3 3 0 1 0 7 10 A 3 3 0 1 0 13 10 Z"
+                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                          StrokeThickness="1.6"
+                          StrokeLineCap="Round"
+                          StrokeJoin="Round"
+                          VerticalAlignment="Center" />
+                    <TextBlock Text="Настройки" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <!-- Only the CONTENT is new. The tint, acrylic, left sidebar, chrome
+               and rounded window shell remain unchanged from approved v0.1.5. -->
+          <Grid Grid.Column="1" Background="Transparent">
+            <Border IsHitTestVisible="False">
+              <Border.Background>
+                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                  <GradientStop Offset="0" Color="#68342B58" />
+                  <GradientStop Offset="0.55" Color="#4B29243F" />
+                  <GradientStop Offset="1" Color="#331D1E34" />
+                </LinearGradientBrush>
+              </Border.Background>
+            </Border>
+
+            <ScrollViewer x:Name="HomePage"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto">
+              <StackPanel Margin="34,49,34,36" Spacing="0">
+
+                <!-- Header / quick actions from the HTML prototype. -->
+                <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,28">
+                  <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8"
+                              VerticalAlignment="Center">
+                    <TextBlock Text="PortHub" Foreground="#9B9CB0" FontSize="12"/>
+                    <TextBlock Text="/" Foreground="#6B697F" FontSize="12"/>
+                    <TextBlock Text="Главная" Foreground="#EDEAF7" FontWeight="SemiBold" FontSize="12"/>
+                  </StackPanel>
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="9"
+                              HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Border x:Name="SearchBox" Classes="search-box" Width="244" Height="38">
+                      <Grid ColumnDefinitions="Auto,*,Auto" Margin="12,0" VerticalAlignment="Center">
+                        <Path Grid.Column="0" Width="16" Height="16" Margin="0,0,8,0"
+                              Data="M 11 11 L 16 16 M 13 7.5 A 5.5 5.5 0 1 1 2 7.5 A 5.5 5.5 0 1 1 13 7.5 Z"
+                              Stroke="#ACA9C5" StrokeThickness="1.6" StrokeLineCap="Round" />
+                        <TextBox Grid.Column="1" x:Name="SearchInput"
+                                 Classes="flat-search"
+                                 PlaceholderText="Поиск приложений..."
+                                 TextChanged="SearchInput_TextChanged"
+                                 FontSize="12" VerticalAlignment="Center" />
+                        <Border Grid.Column="2" Classes="key-chip" Margin="4,0,0,0">
+                          <TextBlock Text="Ctrl K" FontSize="10" Foreground="#9897B0"/>
+                        </Border>
+                      </Grid>
+                    </Border>
+                    <Button Classes="top-icon" Click="OpenSettings_Click"
+                            ToolTip.Tip="Настройки">
+                      <Path Width="18" Height="18" Stretch="Uniform"
+                            Data="M 8 2 L 12 2 L 12.6 4.2 L 14.3 4.9 L 16.4 3.8 L 18.5 7.2 L 16.9 8.9 L 16.9 11.1 L 18.5 12.8 L 16.4 16.2 L 14.3 15.1 L 12.6 15.8 L 12 18 L 8 18 L 7.4 15.8 L 5.7 15.1 L 3.6 16.2 L 1.5 12.8 L 3.1 11.1 L 3.1 8.9 L 1.5 7.2 L 3.6 3.8 L 5.7 4.9 L 7.4 4.2 Z M 13 10 A 3 3 0 1 0 7 10 A 3 3 0 1 0 13 10 Z"
+                            Stroke="#C9C5DA" StrokeThickness="1.5" Fill="Transparent"/>
+                    </Button>
+                    <Button Classes="primary-action" Height="38" Click="ShowAddRepository_Click">
+                      <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+                        <TextBlock Text="+" FontSize="18" FontWeight="Medium" VerticalAlignment="Center"/>
+                        <TextBlock Text="Добавить репозиторий" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                      </StackPanel>
+                    </Button>
+                  </StackPanel>
+                </Grid>
+
+                <!-- Welcome: copy and proportions are carried over from the prototype. -->
+                <TextBlock Text="P O R T H U B" Foreground="#B0A5FF" FontSize="11"
+                           FontWeight="Bold" Margin="0,0,0,10"/>
+                <TextBlock Text="Добро пожаловать в PortHub" FontSize="31"
+                           Foreground="#F4F1FC" FontWeight="Bold" Margin="0,0,0,7"/>
+                <TextBlock Text="Управляй портами, сборками и утилитами — быстро, удобно и в одном месте."
+                           Foreground="#ADA9BF" FontSize="13" Margin="0,0,0,24"/>
+
+                <!-- Hero banner with vector logo art, no web images or external fonts. -->
+                <Border Height="206" CornerRadius="18" BorderThickness="1"
+                        BorderBrush="#765E5B94" ClipToBounds="True" Margin="0,0,0,18">
+                  <Border.Background>
+                    <LinearGradientBrush StartPoint="0%,55%" EndPoint="100%,25%">
+                      <GradientStop Offset="0" Color="#A3483A78"/>
+                      <GradientStop Offset="0.65" Color="#8A48418D"/>
+                      <GradientStop Offset="1" Color="#A24D4BB0"/>
+                    </LinearGradientBrush>
+                  </Border.Background>
+                  <Grid x:Name="HeroLayout" ColumnDefinitions="*,220" Margin="26,19,10,19">
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                      <TextBlock Text="Управляй своими портами&#10;из одного места"
+                                 FontSize="25" FontWeight="Bold" Foreground="#FFFFFF"
+                                 TextWrapping="Wrap" LineHeight="31" Margin="0,0,0,10"/>
+                      <TextBlock Text="Добавляй репозитории, скачивай сборки, следи&#10;за обновлениями и держи проекты под контролем."
+                                 Foreground="#C9C2E0" FontSize="12" TextWrapping="Wrap"
+                                 Margin="0,0,0,18"/>
+                      <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button Classes="primary-action" Click="ShowAddRepository_Click">
+                          <TextBlock Text="+  Добавить репозиторий" FontSize="12" FontWeight="SemiBold"/>
+                        </Button>
+                        <Button Classes="secondary-action" Click="OpenLibrary_Click">
+                          <TextBlock Text="Открыть библиотеку" FontSize="12" FontWeight="SemiBold"/>
+                        </Button>
+                      </StackPanel>
+                    </StackPanel>
+                    <Canvas x:Name="HeroArt" Grid.Column="1" Width="205" Height="176" HorizontalAlignment="Center"
+                            VerticalAlignment="Center" IsHitTestVisible="False">
+                      <Ellipse Canvas.Left="28" Canvas.Top="12" Width="180" Height="150"
+                               Fill="#1BADA1FF"/>
+                      <Border Canvas.Left="60" Canvas.Top="80" Width="112" Height="82"
+                              CornerRadius="19" BorderThickness="1" BorderBrush="#8DABA5FF"
+                              Background="#76625DE0" BoxShadow="0 12 26 0 #5C1D1747">
+                        <Border.RenderTransform><RotateTransform Angle="-23" /></Border.RenderTransform>
+                      </Border>
+                      <Border Canvas.Left="55" Canvas.Top="51" Width="128" Height="90"
+                              CornerRadius="20" BorderThickness="1" BorderBrush="#A8B8B2FF"
+                              BoxShadow="0 14 30 0 #792C1B68">
+                        <Border.Background>
+                          <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                            <GradientStop Offset="0" Color="#D5A09AFB" />
+                            <GradientStop Offset="1" Color="#B95750D2" />
+                          </LinearGradientBrush>
+                        </Border.Background>
+                        <Border.RenderTransform><RotateTransform Angle="-23" /></Border.RenderTransform>
+                      </Border>
+                      <Path Canvas.Left="102" Canvas.Top="79" Width="46" Height="41"
+                            Stretch="Uniform"
+                            Data="M 10 2 L 18 6.5 L 10 11 L 2 6.5 Z M 2 11 L 10 15.5 L 18 11 M 2 15 L 10 19 L 18 15"
+                            Stroke="#FFFFFF" StrokeThickness="1.8" Fill="Transparent"
+                            StrokeJoin="Round" StrokeLineCap="Round"/>
+                    </Canvas>
+                  </Grid>
+                </Border>
+
+                <!-- Statistics reflect saved repositories and actual downloaded files. -->
+                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12" Margin="0,0,0,28">
+                  <Border Classes="glass-card" Grid.Column="0" Height="88" Padding="16,12">
+                    <StackPanel>
+                      <TextBlock Text="В библиотеке" FontSize="11" Foreground="#AFAABE"/>
+                      <TextBlock x:Name="LibraryCountText" Text="0" FontSize="27"
+                                 Foreground="#F7F5FF" FontWeight="Bold" Margin="0,2,0,0"/>
+                    </StackPanel>
+                  </Border>
+                  <Border Classes="glass-card" Grid.Column="1" Height="88" Padding="16,12">
+                    <StackPanel>
+                      <TextBlock Text="Скачано файлов" FontSize="11" Foreground="#AFAABE"/>
+                      <TextBlock x:Name="DownloadCountText" Text="0" FontSize="27"
+                                 Foreground="#F7F5FF" FontWeight="Bold" Margin="0,2,0,0"/>
+                    </StackPanel>
+                  </Border>
+                  <Border Classes="glass-card" Grid.Column="2" Height="88" Padding="16,12">
+                    <StackPanel>
+                      <TextBlock Text="Доступно обновлений" FontSize="11" Foreground="#AFAABE"/>
+                      <TextBlock x:Name="UpdateCountText" Text="0" FontSize="27" Foreground="#F7F5FF"
+                                 FontWeight="Bold" Margin="0,2,0,0"/>
+                    </StackPanel>
+                  </Border>
+                </Grid>
+
+                <TextBlock x:Name="SyncStatusText" Text="" FontSize="11"
+                           Foreground="#A9A1C1" Margin="0,0,0,13"/>
+                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,15">
+                  <TextBlock Text="Репозитории" Foreground="#F0EDFA" FontSize="17"
+                             FontWeight="SemiBold" VerticalAlignment="Center"/>
+                  <Button Grid.Column="1" Classes="text-action" Click="OpenLibrary_Click"
+                          Content="Все приложения  →"/>
+                </Grid>
+                <ItemsControl x:Name="HomeCards">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <UniformGrid Columns="3" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Border Classes="app-card" Margin="0,0,12,12" Padding="15"
+                              MinHeight="183">
+                        <Grid RowDefinitions="Auto,*,Auto">
+                          <Grid ColumnDefinitions="44,*" ColumnSpacing="11">
+                            <Border Width="44" Height="44" CornerRadius="12"
+                                    Background="#5C6F62BB" VerticalAlignment="Top">
+                              <TextBlock Text="{Binding Symbol}" FontSize="24"
+                                         Foreground="#D8D2FF" HorizontalAlignment="Center"
+                                         VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" Spacing="3">
+                              <TextBlock Text="{Binding Title}" FontSize="14"
+                                         FontWeight="SemiBold" Foreground="#F6F2FD"
+                                         TextWrapping="Wrap"/>
+                              <TextBlock Text="{Binding RepositoryLabel}" FontSize="10"
+                                         Foreground="#9693AA" TextWrapping="Wrap"/>
+                            </StackPanel>
+                          </Grid>
+                          <TextBlock Grid.Row="1" Text="{Binding Description}" FontSize="11.5"
+                                     Foreground="#AAA5BF" TextWrapping="Wrap" Margin="0,12,0,12"/>
+                          <Grid Grid.Row="2" ColumnDefinitions="*,Auto">
+                            <Border Background="#494E4784" BorderBrush="#454C486A"
+                                    BorderThickness="1" CornerRadius="12" Padding="8,4"
+                                    HorizontalAlignment="Left" VerticalAlignment="Center">
+                              <TextBlock Text="{Binding Badge}" Foreground="#C1B9FD" FontSize="10"/>
+                            </Border>
+                            <Button Grid.Column="1" Classes="card-action"
+                                    Tag="{Binding RepositoryKey}"
+                                    Content="{Binding ActionLabel}"
+                                    Click="RepositoryCard_Click"/>
+                          </Grid>
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock x:Name="NoResultsText" IsVisible="False"
+                           Text="Библиотека пуста."
+                           Foreground="#AFAABE" HorizontalAlignment="Center"
+                           Margin="0,18,0,18"/>
+
+              </StackPanel>
+            </ScrollViewer>
+
+            <!-- Библиотека: только сохранённые публичные GitHub-репозитории. -->
+            <ScrollViewer x:Name="LibraryPage" IsVisible="False"
+                          HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+              <StackPanel Margin="34,57,34,40" Spacing="16">
+                <TextBlock Text="Библиотека" Foreground="#F4F1FC" FontSize="31" FontWeight="Bold"/>
+                <TextBlock Text="Публичные репозитории, которые ты добавил в PortHub."
+                           Foreground="#ADA9BF" FontSize="13"/>
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                  <TextBox x:Name="LibrarySearchInput" Grid.Column="0" Classes="flat-search"
+                           Background="#5B1B1B30" BorderBrush="#554C4965" BorderThickness="1"
+                           CornerRadius="10" Padding="12,10"
+                           PlaceholderText="Поиск репозиториев" TextChanged="SearchInput_TextChanged"/>
+                  <Button Grid.Column="1" Classes="secondary-action" Content="Обновить с GitHub"
+                          Click="RefreshRepositories_Click"/>
+                  <Button Grid.Column="2" Classes="primary-action" Content="+ Добавить"
+                          Click="ShowAddRepository_Click"/>
+                </Grid>
+                <ItemsControl x:Name="LibraryCards">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><UniformGrid Columns="3"/></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Border Classes="app-card" Margin="0,0,12,12" Padding="15" MinHeight="191">
+                        <Grid RowDefinitions="Auto,*,Auto">
+                          <StackPanel Spacing="5">
+                            <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold"
+                                       Foreground="#F4F0FF" TextWrapping="Wrap"/>
+                            <TextBlock Text="{Binding RepositoryLabel}" FontSize="10"
+                                       Foreground="#A8A1BA" TextWrapping="Wrap"/>
+                          </StackPanel>
+                          <TextBlock Grid.Row="1" Text="{Binding Description}"
+                                     Foreground="#BBB3CD" FontSize="11.5" TextWrapping="Wrap"
+                                     Margin="0,12,0,12"/>
+                          <StackPanel Grid.Row="2" Spacing="10">
+                            <TextBlock Text="{Binding Badge}" Foreground="#C5B8FF" FontSize="10"/>
+                            <StackPanel Orientation="Horizontal" Spacing="9">
+                              <Button Classes="primary-action" Content="{Binding ActionLabel}"
+                                      Tag="{Binding RepositoryKey}" Click="RepositoryCard_Click"/>
+                              <Button Classes="secondary-action" Content="Убрать"
+                                      Tag="{Binding RepositoryKey}" Click="LibraryRemove_Click"/>
+                            </StackPanel>
+                          </StackPanel>
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock x:Name="LibraryEmptyText" IsVisible="False" Foreground="#B9B0C9"
+                           HorizontalAlignment="Center" TextWrapping="Wrap" Margin="0,22,0,0"/>
+              </StackPanel>
+            </ScrollViewer>
+
+            <!-- Загрузки: реально скачанные файлы, отмена и открытие в проводнике. -->
+            <ScrollViewer x:Name="DownloadsPage" IsVisible="False"
+                          HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+              <StackPanel Margin="34,57,34,40" Spacing="16">
+                <TextBlock Text="Загрузки" Foreground="#F4F1FC" FontSize="31" FontWeight="Bold"/>
+                <TextBlock Text="Файлы релизов GitHub, загруженные через PortHub."
+                           Foreground="#ADA9BF" FontSize="13"/>
+                <Border Classes="glass-card" Padding="18">
+                  <StackPanel Spacing="12">
+                    <TextBlock x:Name="DownloadStatusText" Text="Активных загрузок нет."
+                               Foreground="#E1DCF1" FontSize="12" TextWrapping="Wrap"/>
+                    <ProgressBar x:Name="DownloadProgressBar" IsVisible="False" Minimum="0"
+                                 Maximum="100" Value="0" Height="6" Foreground="#9990FF"/>
+                    <Button x:Name="CancelDownloadButton" IsVisible="False" Classes="secondary-action"
+                            Content="Отменить загрузку" HorizontalAlignment="Left"
+                            Click="CancelDownload_Click"/>
+                  </StackPanel>
+                </Border>
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Text="История файлов" Foreground="#F4F1FC" FontSize="17"
+                             FontWeight="SemiBold" VerticalAlignment="Center"/>
+                  <Button Grid.Column="1" Classes="secondary-action" Content="Открыть папку загрузок"
+                          Click="OpenDownloadsFolder_Click"/>
+                </Grid>
+                <ItemsControl x:Name="DownloadItems">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Border Classes="glass-card" Padding="16" Margin="0,0,0,8">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                          <StackPanel Spacing="5">
+                            <TextBlock Text="{Binding FileName}" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="#F6F2FF" TextWrapping="Wrap"/>
+                            <TextBlock Text="{Binding Detail}" FontSize="11"
+                                       Foreground="#B7B0CC" TextWrapping="Wrap"/>
+                          </StackPanel>
+                          <Button Grid.Column="1" Classes="secondary-action" Content="Показать в папке"
+                                  Tag="{Binding FilePath}" Click="DownloadRow_OpenFolder"/>
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock x:Name="DownloadsEmptyText" Text="Скачанных файлов пока нет."
+                           Foreground="#B7B0C9" HorizontalAlignment="Center" Margin="0,18,0,0"/>
+              </StackPanel>
+            </ScrollViewer>
+
+            <!-- Обновления сравниваются с реально скачанными release ID. -->
+            <ScrollViewer x:Name="UpdatesPage" IsVisible="False"
+                          HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+              <StackPanel Margin="34,57,34,40" Spacing="16">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Text="Обновления" Foreground="#F4F1FC" FontSize="31" FontWeight="Bold"/>
+                  <Button Grid.Column="1" Classes="secondary-action" Content="Проверить GitHub"
+                          Click="RefreshRepositories_Click"/>
+                </Grid>
+                <TextBlock Text="Новые стабильные релизы относительно последнего скачанного релиза каждого проекта."
+                           Foreground="#ADA9BF" FontSize="13" TextWrapping="Wrap"/>
+                <ItemsControl x:Name="UpdateItems">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Border Classes="glass-card" Padding="16" Margin="0,0,0,8">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                          <StackPanel Spacing="6">
+                            <TextBlock Text="{Binding Name}" Foreground="#F4F0FC"
+                                       FontSize="14" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding Detail}" Foreground="#B9B3CA" FontSize="12"/>
+                          </StackPanel>
+                          <Button Grid.Column="1" Classes="primary-action" Content="Открыть релиз"
+                                  Tag="{Binding RepositoryKey}" Click="UpdateRow_OpenRelease"/>
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock x:Name="UpdatesEmptyText"
+                           Text="Новых версий для скачанных релизов не обнаружено."
+                           Foreground="#B7B0C9" HorizontalAlignment="Center" Margin="0,18,0,0"/>
+              </StackPanel>
+            </ScrollViewer>
+
+            <!-- Настройки папки, в которую действительно сохраняются загрузки. -->
+            <ScrollViewer x:Name="SettingsPage" IsVisible="False"
+                          HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+              <StackPanel Margin="34,57,34,40" Spacing="17">
+                <TextBlock Text="Настройки" Foreground="#F4F1FC" FontSize="31" FontWeight="Bold"/>
+                <TextBlock Text="Локальные настройки загрузок PortHub."
+                           Foreground="#ADA9BF" FontSize="13"/>
+                <Border Classes="glass-card" Padding="20">
+                  <StackPanel Spacing="15">
+                    <TextBlock Text="Папка загрузок" FontSize="17" FontWeight="SemiBold"
+                               Foreground="#F4F0FC"/>
+                    <TextBlock Text="Все файлы из GitHub Releases сохраняются в выбранной папке."
+                               Foreground="#B7B0CA" FontSize="12" TextWrapping="Wrap"/>
+                    <TextBox x:Name="DownloadFolderInput" Background="#6C1A1A30"
+                             Foreground="#F7F2FC" BorderBrush="#655F5B7A" BorderThickness="1"
+                             CornerRadius="10" Padding="12,10"/>
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                      <Button Classes="secondary-action" Content="Выбрать папку"
+                              Click="PickDownloadFolder_Click"/>
+                      <Button Classes="primary-action" Content="Сохранить"
+                              Click="SaveSettings_Click"/>
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+            </ScrollViewer>
+
+          </Grid>
+        </Grid>
+      </Grid>
+    </Border>
+
+    <!-- Invisible drag area. 34px hit region, but NO visible titlebar strip. -->
+    <Border Height="34" VerticalAlignment="Top"
+            HorizontalAlignment="Stretch"
+            Background="Transparent"
+            chrome:WindowDecorationProperties.ElementRole="TitleBar" />
+
+    <StackPanel Orientation="Horizontal"
+                Spacing="3"
+                Margin="0,5,11,0"
+                VerticalAlignment="Top"
+                HorizontalAlignment="Right"
+               >
+      <Button Classes="chrome-button"
+              ToolTip.Tip="Свернуть"
+              Click="Minimize_Click"
+              chrome:WindowDecorationProperties.ElementRole="MinimizeButton">
+        <Path Width="15" Height="15"
+              Data="M 3 9 L 15 9"
+              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+              StrokeThickness="1.5"
+              StrokeLineCap="Round" />
+      </Button>
+      <Button Classes="chrome-button"
+              ToolTip.Tip="Развернуть / восстановить"
+              Click="Maximize_Click"
+              chrome:WindowDecorationProperties.ElementRole="MaximizeButton">
+        <Path x:Name="MaximizeGlyph"
+              Width="15" Height="15"
+              Data="M 4.5 4.5 L 13.5 4.5 L 13.5 13.5 L 4.5 13.5 Z"
+              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+              StrokeThickness="1.45"
+              StrokeJoin="Round" />
+      </Button>
+      <Button Classes="chrome-button close-button"
+              ToolTip.Tip="Закрыть"
+              Click="Close_Click"
+              chrome:WindowDecorationProperties.ElementRole="CloseButton">
+        <Path Width="15" Height="15"
+              Data="M 5 5 L 13 13 M 13 5 L 5 13"
+              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+              StrokeThickness="1.6"
+              StrokeLineCap="Round" />
+      </Button>
+    </StackPanel>
+
+    <!-- Resize grips are invisible and turned off when maximized. -->
+    <Grid x:Name="ResizeLayer">
+      <Border HorizontalAlignment="Left" VerticalAlignment="Top"
+              Width="9" Height="9" Background="Transparent"
+              chrome:WindowDecorationProperties.ElementRole="ResizeNW" />
+      <Border HorizontalAlignment="Right" VerticalAlignment="Top"
+              Width="9" Height="9" Background="Transparent"
+              chrome:WindowDecorationProperties.ElementRole="ResizeNE" />
+      <Border HorizontalAlignment="Left" VerticalAlignment="Bottom"
+              Width="9" Height="9" Background="Transparent"
+              chrome:WindowDecorationProperties.ElementRole="ResizeSW" />
+      <Border HorizontalAlignment="Right" VerticalAlignment="Bottom"
+              Width="9" Height="9" Background="Transparent"
+              chrome:WindowDecorationProperties.ElementRole="ResizeSE" />
+      <Border HorizontalAlignment="Stretch" VerticalAlignment="Top"
+              Height="6" Margin="9,0"
+              Background="Transparent"
+              chrome:WindowDecorationProperties.ElementRole="ResizeN" />
+      <Border HorizontalAlignment="Stretch" VerticalAlignment="Bottom"
+              Height="6" Margin="9,0"
+              Background="Transparent"
+              chrome:WindowDecorationProperties.ElementRole="ResizeS" />
+      <Border HorizontalAlignment="Left" VerticalAlignment="Stretch"
+              Width="6" Margin="0,9"
+              Background="Transparent"
+              chrome:WindowDecorationProperties.ElementRole="ResizeW" />
+      <Border HorizontalAlignment="Right" VerticalAlignment="Stretch"
+              Width="6" Margin="0,9"
+              Background="Transparent"
+              chrome:WindowDecorationProperties.ElementRole="ResizeE" />
+    </Grid>
+
+    <!-- Repository addition validates the URL against the real GitHub API. -->
+    <Border x:Name="AddRepoOverlay" IsVisible="False"
+            Background="#CE080916">
+      <Border Width="464" MaxWidth="464" CornerRadius="18"
+              BorderThickness="1" BorderBrush="#796C6397"
+              Background="#F029263C" Padding="27"
+              HorizontalAlignment="Center" VerticalAlignment="Center"
+              BoxShadow="0 24 70 0 #A3080816">
+        <StackPanel Spacing="12">
+          <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,2">
+            <TextBlock Text="Добавить GitHub-репозиторий"
+                       Foreground="#F4F0FC" FontWeight="Bold" FontSize="21"
+                       VerticalAlignment="Center"/>
+            <Button Grid.Column="1" Classes="top-icon" Content="×"
+                    FontSize="21" Click="CancelAddRepository_Click"
+                    ToolTip.Tip="Закрыть"/>
+          </Grid>
+          <TextBlock Text="Вставь ссылку на публичный репозиторий. PortHub проверит его через GitHub API и получит опубликованный релиз."
+                     Foreground="#B8B2C9" FontSize="12" TextWrapping="Wrap"/>
+          <TextBlock Text="Ссылка на репозиторий" Foreground="#EDEAF8"
+                     FontWeight="SemiBold" FontSize="12" Margin="0,11,0,0"/>
+          <TextBox x:Name="RepoUrlInput"
+                   PlaceholderText="https://github.com/owner/repository"
+                   Background="#9A17192B" Foreground="#F1EEFC"
+                   BorderBrush="#74605A7E" BorderThickness="1"
+                   CornerRadius="9" Padding="12,11"/>
+          <TextBlock x:Name="RepoErrorText" IsVisible="False"
+                     FontSize="11" Foreground="#FFC5BC"
+                     TextWrapping="Wrap"/>
+          <TextBlock Text="Поддерживается только прямая ссылка на github.com/owner/repo."
+                     Foreground="#9B96AE" FontSize="10"/>
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                      Spacing="10" Margin="0,10,0,0">
+            <Button Classes="secondary-action" Content="Отмена"
+                    Click="CancelAddRepository_Click"/>
+            <Button x:Name="ConfirmAddButton" Classes="primary-action" Content="Добавить"
+                    Click="ConfirmAddRepository_Click"/>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Border>
+
+
+    <Border x:Name="ReleaseOverlay" IsVisible="False" Background="#CE080916">
+      <Border Width="570" MaxHeight="650" CornerRadius="18"
+              BorderThickness="1" BorderBrush="#796C6397"
+              Background="#F029263C" Padding="26"
+              HorizontalAlignment="Center" VerticalAlignment="Center">
+        <Grid RowDefinitions="Auto,Auto,*,Auto">
+          <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,9">
+            <TextBlock x:Name="ReleaseTitleText" FontSize="21" FontWeight="Bold"
+                       Foreground="#F4F0FC" TextWrapping="Wrap"/>
+            <Button Grid.Column="1" Classes="top-icon" Content="×" FontSize="21"
+                    Click="CloseRelease_Click"/>
+          </Grid>
+          <TextBlock Grid.Row="1" x:Name="ReleaseSubtitleText"
+                     Foreground="#B8B2C9" FontSize="12" Margin="0,0,0,19"/>
+          <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="9">
+              <ItemsControl x:Name="ReleaseAssets">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Border Classes="glass-card" Padding="12" Margin="0,0,0,8">
+                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                        <StackPanel Spacing="4">
+                          <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold"
+                                     TextWrapping="Wrap" Foreground="#F4F0FC"/>
+                          <TextBlock Text="{Binding SizeLabel}" FontSize="11"
+                                     Foreground="#B5ABC7"/>
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="primary-action" Content="Скачать"
+                                Tag="{Binding Asset}" Click="DownloadAsset_Click"/>
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock x:Name="ReleaseEmptyText" Text="К этому релизу не прикреплены файлы."
+                         IsVisible="False" Foreground="#B8B2C9"/>
+            </StackPanel>
+          </ScrollViewer>
+          <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right"
+                      Spacing="10" Margin="0,14,0,0">
+            <Button Classes="secondary-action" Content="Страница релиза на GitHub"
+                    Click="OpenReleasePage_Click"/>
+            <Button Classes="secondary-action" Content="Закрыть" Click="CloseRelease_Click"/>
+          </StackPanel>
+        </Grid>
+      </Border>
+    </Border>
+    <Border x:Name="NoticeSurface" IsVisible="False"
+            Background="#EF29263B" BorderBrush="#776C68A2"
+            BorderThickness="1" CornerRadius="11" Padding="15,10"
+            HorizontalAlignment="Right" VerticalAlignment="Bottom"
+            MaxWidth="420" Margin="0,0,20,22">
+      <TextBlock x:Name="NoticeText" Foreground="#EAE5FF"
+                 FontSize="12" TextWrapping="Wrap"/>
+    </Border>
+  </Grid>
+</Window>
