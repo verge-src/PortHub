@@ -19,7 +19,7 @@ builder.Services.AddHttpClient<GitHubGateway>(client =>
 {
     client.BaseAddress = new Uri("https://api.github.com/");
     client.Timeout = TimeSpan.FromSeconds(15);
-    client.DefaultRequestHeaders.UserAgent.ParseAdd("PortHub-API/0.1.8");
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("PortHub-API/1.0.1");
     client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
     client.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
     client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -65,6 +65,11 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapGet("/api/repos/{owner}/{repo}/overview", GetOverviewHandler)
     .RequireRateLimiting("public-repos");
 
+// Global repository discovery via GitHub Search. Only public repositories are returned.
+// Paginated and cached; release details are fetched only after selecting a project.
+app.MapGet("/api/search/repositories", SearchRepositoriesHandler)
+    .RequireRateLimiting("public-repos");
+
 app.Run();
 
 static async Task<IResult> GetOverviewHandler(
@@ -103,6 +108,42 @@ static async Task<IResult> GetOverviewHandler(
     }
 }
 
+static async Task<IResult> SearchRepositoriesHandler(
+    string? q, int? page, GitHubGateway github, IMemoryCache cache, CancellationToken cancellationToken)
+{
+    string search = (q ?? "").Trim();
+    int number = page ?? 1;
+    if (number is < 1 or > 34 || search.Length > 80 || search.Any(char.IsControl))
+        return Results.BadRequest(new { message = "Неверный поисковый запрос или страница." });
+
+    string cacheKey = $"github-search:{number}:{search.ToLowerInvariant()}";
+    if (cache.TryGetValue(cacheKey, out GlobalSearchResponse? cached) && cached is not null)
+        return Results.Ok(cached);
+
+    try
+    {
+        GlobalSearchResponse result = await github.SearchPublicRepositoriesAsync(search, number, cancellationToken);
+        cache.Set(cacheKey, result, TimeSpan.FromMinutes(5));
+        return Results.Ok(result);
+    }
+    catch (GitHubUpstreamException ex)
+    {
+        return Results.Json(new { message = ex.PublicMessage }, statusCode: 503);
+    }
+    catch (HttpRequestException)
+    {
+        return Results.Json(new { message = "Не удалось подключиться к GitHub." }, statusCode: 502);
+    }
+    catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+    {
+        return Results.Json(new { message = "GitHub не ответил вовремя." }, statusCode: 504);
+    }
+    catch (JsonException)
+    {
+        return Results.Json(new { message = "GitHub вернул некорректные данные." }, statusCode: 502);
+    }
+}
+
 static bool ValidOwner(string value) =>
     Regex.IsMatch(value, @"^[a-zA-Z0-9][a-zA-Z0-9-]{0,38}$", RegexOptions.CultureInvariant)
     && !value.EndsWith('-');
@@ -114,6 +155,8 @@ internal sealed record RepoDto(string Owner, string Name, string FullName, strin
 internal sealed record AssetDto(long Id, string Name, long Size, string DownloadUrl);
 internal sealed record ReleaseDto(long Id, string TagName, string HtmlUrl, IReadOnlyList<AssetDto> Assets);
 internal sealed record RepoOverview(RepoDto Repository, ReleaseDto? LatestRelease);
+internal sealed record GlobalSearchResponse(IReadOnlyList<RepoOverview> Items,
+    int TotalCount, bool HasMore, bool IncompleteResults, int Page);
 
 internal sealed class GitHubUpstreamException(string message) : Exception(message)
 {
@@ -144,10 +187,62 @@ internal sealed class GitHubGateway(HttpClient client)
         string repoHtml = $"https://github.com/{Uri.EscapeDataString(canonicalOwner)}/{Uri.EscapeDataString(canonicalName)}";
         var dto = new RepoDto(canonicalOwner, canonicalName, fullName, description, repoHtml);
 
-        // GitHub /latest excludes prereleases and drafts, and is safe for public repos.
+        ReleaseDto? release = await GetLatestReleaseAsync(canonicalOwner, canonicalName, repoHtml, ct);
+        return new RepoOverview(dto, release);
+    }
+
+    public async Task<GlobalSearchResponse> SearchPublicRepositoriesAsync(
+        string search, int page, CancellationToken ct)
+    {
+        // The default is a discovery page; custom queries search all public GitHub repos.
+        // GitHub Search returns at most 1000 results for a single query.
+        string query = string.IsNullOrWhiteSpace(search)
+            ? "stars:>5000 archived:false fork:false is:public"
+            : $"{search} in:name,description archived:false fork:false is:public";
+        string relativeUrl = $"search/repositories?q={Uri.EscapeDataString(query)}&per_page=30&page={page}"
+            + (string.IsNullOrWhiteSpace(search) ? "&sort=stars&order=desc" : "");
+        using JsonDocument? payload = await GetJsonAsync(relativeUrl, ct);
+        if (payload is null || payload.RootElement.ValueKind != JsonValueKind.Object)
+            throw new GitHubUpstreamException("GitHub не вернул результаты поиска.");
+
+        JsonElement root = payload.RootElement;
+        var matches = new List<RepoOverview>();
+        if (root.TryGetProperty("items", out var items) && items.ValueKind == JsonValueKind.Array)
+        {
+            foreach (JsonElement item in items.EnumerateArray())
+            {
+                // PAT may be authorized for private repos: never return those.
+                if (!item.TryGetProperty("private", out var privacy) || privacy.ValueKind != JsonValueKind.False)
+                    continue;
+                if (item.TryGetProperty("archived", out var archived) && archived.ValueKind == JsonValueKind.True)
+                    continue;
+                if (item.TryGetProperty("fork", out var fork) && fork.ValueKind == JsonValueKind.True)
+                    continue;
+                string owner = item.GetProperty("owner").GetProperty("login").GetString() ?? "";
+                string name = item.GetProperty("name").GetString() ?? "";
+                if (!Regex.IsMatch(owner, @"^[a-zA-Z0-9][a-zA-Z0-9-]{0,38}$", RegexOptions.CultureInvariant)
+                    || owner.EndsWith('-')
+                    || !Regex.IsMatch(name, @"^[a-zA-Z0-9_.-]{1,100}$", RegexOptions.CultureInvariant)
+                    || name is "." or "..") continue;
+                string description = item.TryGetProperty("description", out var d)
+                    && d.ValueKind == JsonValueKind.String ? d.GetString() ?? "" : "";
+                string html = $"https://github.com/{Uri.EscapeDataString(owner)}/{Uri.EscapeDataString(name)}";
+                matches.Add(new RepoOverview(new RepoDto(owner, name, $"{owner}/{name}", description, html), null));
+            }
+        }
+        int total = root.TryGetProperty("total_count", out var count) ? count.GetInt32() : 0;
+        bool incomplete = root.TryGetProperty("incomplete_results", out var flag)
+            && flag.ValueKind == JsonValueKind.True;
+        bool hasMore = matches.Count > 0 && page < 34 && page * 30 < Math.Min(1000, total);
+        return new GlobalSearchResponse(matches, total, hasMore, incomplete, page);
+    }
+
+    private async Task<ReleaseDto?> GetLatestReleaseAsync(string owner, string repo, string repoHtml, CancellationToken ct)
+    {
+        // Only after checking a repo is public or obtaining it from the public listing.
         using JsonDocument? releaseData = await GetJsonAsync(
-            $"repos/{Uri.EscapeDataString(canonicalOwner)}/{Uri.EscapeDataString(canonicalName)}/releases/latest", ct);
-        if (releaseData is null) return new RepoOverview(dto, null);
+            $"repos/{Uri.EscapeDataString(owner)}/{Uri.EscapeDataString(repo)}/releases/latest", ct);
+        if (releaseData is null) return null;
 
         JsonElement release = releaseData.RootElement;
         var assets = new List<AssetDto>();
@@ -173,9 +268,8 @@ internal sealed class GitHubGateway(HttpClient client)
             || !validatedUrl.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase))
             releaseUrl = repoHtml;
 
-        var releaseDto = new ReleaseDto(release.GetProperty("id").GetInt64(),
+        return new ReleaseDto(release.GetProperty("id").GetInt64(),
             release.GetProperty("tag_name").GetString() ?? "", releaseUrl, assets);
-        return new RepoOverview(dto, releaseDto);
     }
 
     private async Task<JsonDocument?> GetJsonAsync(string relativeUrl, CancellationToken ct)

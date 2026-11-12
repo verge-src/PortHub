@@ -25,7 +25,17 @@ namespace PortHub;
 public sealed partial class MainWindow : Window
 {
     private readonly GitHubApi _github = new();
-    private readonly List<SavedRepository> _repositories = new();
+    private readonly List<SavedRepository> _repositories = new(); // manually added
+    private readonly List<SavedRepository> _officialRepositories = new(); // visible global GitHub search results
+    private readonly DispatcherTimer _searchDebounce = new() { Interval = TimeSpan.FromMilliseconds(650) };
+    private CancellationTokenSource? _catalogCancellation;
+    private int _catalogPage = 1;
+    private int _catalogTotal;
+    private bool _catalogHasMore;
+    private bool _catalogIncomplete;
+    private readonly HashSet<string> _releaseLookupPending = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _releaseLookupInProgress = new(StringComparer.OrdinalIgnoreCase);
+    private string? _catalogError;
     private readonly List<DownloadRecord> _downloads = new();
     private readonly Dictionary<string, RepositoryOverview> _overview = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _syncErrors = new(StringComparer.OrdinalIgnoreCase);
@@ -78,6 +88,9 @@ public sealed partial class MainWindow : Window
     private readonly TextBlock _updateCountText;
     private readonly TextBlock _noResultsText;
     private readonly TextBlock _libraryEmptyText;
+    private readonly TextBlock _catalogPageText;
+    private readonly Button _catalogPreviousButton;
+    private readonly Button _catalogNextButton;
     private readonly TextBlock _syncStatusText;
     private readonly TextBlock _downloadStatusText;
     private readonly TextBlock _downloadsEmptyText;
@@ -145,6 +158,9 @@ public sealed partial class MainWindow : Window
         _updateCountText = Get<TextBlock>("UpdateCountText");
         _noResultsText = Get<TextBlock>("NoResultsText");
         _libraryEmptyText = Get<TextBlock>("LibraryEmptyText");
+        _catalogPageText = Get<TextBlock>("CatalogPageText");
+        _catalogPreviousButton = Get<Button>("CatalogPreviousButton");
+        _catalogNextButton = Get<Button>("CatalogNextButton");
         _syncStatusText = Get<TextBlock>("SyncStatusText");
         _downloadStatusText = Get<TextBlock>("DownloadStatusText");
         _downloadsEmptyText = Get<TextBlock>("DownloadsEmptyText");
@@ -167,6 +183,12 @@ public sealed partial class MainWindow : Window
         _updateItems.ItemsSource = _updateRows;
         _releaseAssets.ItemsSource = _assetRows;
         _homePage.SizeChanged += (_, _) => UpdateResponsiveHome();
+        _searchDebounce.Tick += async (_, _) =>
+        {
+            _searchDebounce.Stop();
+            _catalogPage = 1;
+            await RefreshAllRepositoriesAsync();
+        };
 
         LoadState();
         try { Directory.CreateDirectory(_downloadDirectory); }
@@ -200,8 +222,8 @@ public sealed partial class MainWindow : Window
         base.OnOpened(e);
         ApplyNativeWindowAppearance();
         UpdateResponsiveHome();
-        if (_repositories.Count > 0)
-            _ = RefreshAllRepositoriesAsync();
+        _ = RefreshAllRepositoriesAsync();
+        _ = SyncSavedRepositoriesAsync();
     }
 
     private void UpdateResponsiveHome()
@@ -250,10 +272,17 @@ public sealed partial class MainWindow : Window
         if (!ReferenceEquals(source, _searchInput)) _searchInput.Text = source.Text;
         if (!ReferenceEquals(source, _librarySearchInput)) _librarySearchInput.Text = source.Text;
         _updatingSearch = false;
+        _syncStatusText.Text = string.IsNullOrWhiteSpace(_query)
+            ? "Загружаем популярные публичные проекты…" : "Поиск на GitHub…";
+        _searchDebounce.Stop();
+        _searchDebounce.Start();
         UpdateContent();
     }
 
     private static string RepositoryKey(string owner, string name) => $"{owner}/{name}";
+    private List<SavedRepository> VisibleRepositories() => _officialRepositories.Concat(_repositories)
+        .GroupBy(repo => RepositoryKey(repo.Owner, repo.Name), StringComparer.OrdinalIgnoreCase)
+        .Select(group => group.First()).ToList();
     private string? LatestDownloadedTag(string key) => _downloads
         .Where(d => d.RepositoryKey.Equals(key, StringComparison.OrdinalIgnoreCase) && File.Exists(d.FilePath))
         .OrderByDescending(d => d.DownloadedAt).Select(d => d.TagName).FirstOrDefault();
@@ -273,10 +302,15 @@ public sealed partial class MainWindow : Window
     {
         if (_homeCards is null) return;
         var displayed = new List<RepositoryCard>();
-        foreach (SavedRepository repo in _repositories)
+        foreach (SavedRepository repo in VisibleRepositories())
         {
             string key = RepositoryKey(repo.Owner, repo.Name);
-            if (!key.Contains(_query, StringComparison.OrdinalIgnoreCase))
+            bool official = _officialRepositories.Any(r =>
+                RepositoryKey(r.Owner, r.Name).Equals(key, StringComparison.OrdinalIgnoreCase));
+            // Search-result entries already match GitHub's global query.
+            // Locally saved entries may additionally be filtered by the same term.
+            if (!official && !string.IsNullOrWhiteSpace(_query)
+                && !key.Contains(_query, StringComparison.OrdinalIgnoreCase))
             {
                 if (!_overview.TryGetValue(key, out var match) ||
                     !match.Repository.Description.Contains(_query, StringComparison.OrdinalIgnoreCase))
@@ -285,30 +319,37 @@ public sealed partial class MainWindow : Window
             bool loaded = _overview.TryGetValue(key, out var info);
             bool failed = _syncErrors.TryGetValue(key, out var error);
             GitHubRelease? release = loaded ? info!.LatestRelease : null;
-            string badge = failed ? "ОШИБКА СИНХРОНИЗАЦИИ" : !loaded ? "ЗАГРУЗКА" :
-                release is null ? "БЕЗ РЕЛИЗОВ" : $"РЕЛИЗ · {release.TagName}";
+            string badge = failed ? "ОШИБКА СИНХРОНИЗАЦИИ" :
+                _releaseLookupPending.Contains(key) ? "РЕЛИЗЫ ПО ЗАПРОСУ" :
+                !loaded ? "ЗАГРУЗКА" : release is null ? "БЕЗ РЕЛИЗОВ" : $"РЕЛИЗ · {release.TagName}";
+            if (official) badge = "GITHUB · " + badge;
             string description = failed ? error! : !loaded ? "Получение данных GitHub…" :
                 string.IsNullOrWhiteSpace(info!.Repository.Description)
                     ? "Описание отсутствует в GitHub." : info.Repository.Description;
             displayed.Add(new RepositoryCard(info?.Repository.Name ?? repo.Name,
                 info?.Repository.FullName ?? key, description,
                 (info?.Repository.Name ?? repo.Name)[..1].ToUpperInvariant(), badge,
-                release is { Assets.Count: > 0 } ? "Скачать" : "GitHub", key));
+                release is { Assets.Count: > 0 } ? "Скачать" :
+                _releaseLookupPending.Contains(key) ? "Проверить релиз" : "GitHub",
+                key, !official));
         }
         _cards.Clear();
         foreach (var card in displayed) _cards.Add(card);
-        _libraryCountText.Text = _repositories.Count.ToString();
+        _libraryCountText.Text = _catalogTotal.ToString("N0");
+        _catalogPreviousButton.IsEnabled = !_isRefreshing && _catalogPage > 1;
+        _catalogNextButton.IsEnabled = !_isRefreshing && _catalogHasMore;
+        _catalogPageText.Text = $"Страница {_catalogPage} · максимум 1000 результатов";
         _downloadCountText.Text = _downloads.Count(d => File.Exists(d.FilePath)).ToString();
-        int updateCount = _repositories.Count(repo =>
+        int updateCount = VisibleRepositories().Count(repo =>
         {
             string key = RepositoryKey(repo.Owner, repo.Name);
             return _overview.TryGetValue(key, out var info)
                 && info.LatestRelease is not null && HasUpdate(key, info.LatestRelease);
         });
         _updateCountText.Text = _syncErrors.Count > 0 ? "?" : updateCount.ToString();
-        _noResultsText.Text = _repositories.Count == 0
-            ? "Библиотека пуста. Добавь ссылку на публичный репозиторий GitHub."
-            : "По запросу ничего не найдено.";
+        _noResultsText.Text = _isRefreshing ? "Поиск публичных проектов GitHub…" :
+            _catalogError is not null ? "Поиск недоступен: " + _catalogError :
+            "По запросу ничего не найдено. Попробуй другие слова.";
         _noResultsText.IsVisible = _cards.Count == 0;
         _libraryEmptyText.Text = _noResultsText.Text;
         _libraryEmptyText.IsVisible = _cards.Count == 0;
@@ -318,33 +359,107 @@ public sealed partial class MainWindow : Window
 
     private async Task RefreshAllRepositoriesAsync()
     {
-        if (_isRefreshing) return;
+        // Cancel the previous global search when a newer query or page is requested.
+        _catalogCancellation?.Cancel();
+        var current = new CancellationTokenSource();
+        _catalogCancellation = current;
+        CancellationToken cancellationToken = current.Token;
+        string search = _query;
+        int page = _catalogPage;
         _isRefreshing = true;
-        _syncStatusText.Text = "Синхронизация с GitHub…";
-        foreach (SavedRepository repo in _repositories.ToArray())
+        _catalogError = null;
+        _syncStatusText.Text = string.IsNullOrWhiteSpace(search)
+            ? "Загружаем популярные публичные проекты GitHub…"
+            : $"Поиск по GitHub: {search}";
+        UpdateContent();
+        try
         {
-            string key = RepositoryKey(repo.Owner, repo.Name);
-            try
+            SearchCatalogPage results = await _github.SearchRepositoriesAsync(search, page, cancellationToken);
+            if (cancellationToken.IsCancellationRequested) return;
+            _officialRepositories.Clear();
+            _catalogTotal = results.TotalCount;
+            _catalogHasMore = results.HasMore;
+            _catalogIncomplete = results.IncompleteResults;
+            foreach (CatalogEntry entry in results.Items)
             {
-                var info = await _github.GetOverviewAsync(repo.Owner, repo.Name);
-                _overview[key] = info;
+                var info = entry.Overview;
+                string key = RepositoryKey(info.Repository.Owner, info.Repository.Name);
+                if (_officialRepositories.Any(r => RepositoryKey(r.Owner, r.Name).Equals(key, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+                _officialRepositories.Add(new SavedRepository(info.Repository.Owner, info.Repository.Name));
+                // Preserve a release already checked when returning to an earlier page.
+                if (!_overview.TryGetValue(key, out var previous) || previous.LatestRelease is null)
+                {
+                    _overview[key] = info;
+                    _releaseLookupPending.Add(key);
+                }
+                else _releaseLookupPending.Remove(key);
                 _syncErrors.Remove(key);
             }
-            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException)
-            {
-                _overview.Remove(key);
-                _syncErrors[key] = ex.Message;
-            }
-            UpdateContent();
+            _catalogError = null;
+            _syncStatusText.Text = $"Найдено по всему GitHub: {_catalogTotal:N0} · страница {page}"
+                + (_catalogIncomplete ? " · GitHub вернул неполные результаты" : "");
         }
-        _isRefreshing = false;
-        _syncStatusText.Text = _syncErrors.Count == 0 ? "Синхронизация завершена" :
-            $"Не удалось обновить: {_syncErrors.Count}";
-        UpdateContent();
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException
+            or JsonException or InvalidOperationException)
+        {
+            if (cancellationToken.IsCancellationRequested) return;
+            _catalogError = ex.Message;
+            _syncStatusText.Text = "Не удалось выполнить поиск: " + ex.Message;
+        }
+        finally
+        {
+            if (ReferenceEquals(_catalogCancellation, current))
+            {
+                _catalogCancellation = null;
+                _isRefreshing = false;
+                UpdateContent();
+            }
+            current.Dispose();
+        }
     }
 
     private async void RefreshRepositories_Click(object? sender, RoutedEventArgs e) =>
         await RefreshAllRepositoriesAsync();
+
+    private async void CatalogPrevious_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_catalogPage <= 1 || _isRefreshing) return;
+        _catalogPage--;
+        await RefreshAllRepositoriesAsync();
+    }
+
+    private async void CatalogNext_Click(object? sender, RoutedEventArgs e)
+    {
+        if (!_catalogHasMore || _isRefreshing) return;
+        _catalogPage++;
+        await RefreshAllRepositoriesAsync();
+    }
+
+    private async Task SyncSavedRepositoriesAsync()
+    {
+        foreach (SavedRepository repo in _repositories.ToArray())
+        {
+            string key = RepositoryKey(repo.Owner, repo.Name);
+            if (_overview.ContainsKey(key)) continue;
+            try
+            {
+                RepositoryOverview info = await _github.GetOverviewAsync(repo.Owner, repo.Name);
+                _overview[key] = info;
+                _syncErrors.Remove(key);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException
+                or JsonException or InvalidOperationException)
+            {
+                _syncErrors[key] = ex.Message;
+            }
+            UpdateContent();
+        }
+    }
 
     private void ShowAddRepository_Click(object? sender, RoutedEventArgs e)
     {
@@ -372,9 +487,9 @@ public sealed partial class MainWindow : Window
             return;
         }
         string key = RepositoryKey(repo.Owner, repo.Name);
-        if (_repositories.Any(x => RepositoryKey(x.Owner, x.Name).Equals(key, StringComparison.OrdinalIgnoreCase)))
+        if (VisibleRepositories().Any(x => RepositoryKey(x.Owner, x.Name).Equals(key, StringComparison.OrdinalIgnoreCase)))
         {
-            ShowRepoError("Репозиторий уже добавлен.");
+            ShowRepoError("Этот репозиторий уже есть в библиотеке.");
             return;
         }
         _confirmAddButton.IsEnabled = false;
@@ -384,7 +499,7 @@ public sealed partial class MainWindow : Window
             RepositoryOverview info = await _github.GetOverviewAsync(repo.Owner, repo.Name);
             var saved = new SavedRepository(info.Repository.Owner, info.Repository.Name);
             string actualKey = RepositoryKey(saved.Owner, saved.Name);
-            if (_repositories.Any(x => RepositoryKey(x.Owner, x.Name).Equals(actualKey, StringComparison.OrdinalIgnoreCase)))
+            if (VisibleRepositories().Any(x => RepositoryKey(x.Owner, x.Name).Equals(actualKey, StringComparison.OrdinalIgnoreCase)))
             {
                 ShowRepoError("Репозиторий уже добавлен.");
                 return;
@@ -419,9 +534,28 @@ public sealed partial class MainWindow : Window
         _repoErrorText.IsVisible = true;
     }
 
-    private void RepositoryCard_Click(object? sender, RoutedEventArgs e)
+    private async void RepositoryCard_Click(object? sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: string key }) return;
+        if (_releaseLookupPending.Contains(key))
+        {
+            if (!_releaseLookupInProgress.Add(key)) return;
+            try
+            {
+                string[] parts = key.Split('/', 2);
+                var fetched = await _github.GetOverviewAsync(parts[0], parts[1]);
+                _overview[key] = fetched;
+                _releaseLookupPending.Remove(key);
+                _syncErrors.Remove(key);
+                UpdateContent();
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException)
+            {
+                ShowNotice("Не удалось проверить релиз: " + ex.Message);
+                return;
+            }
+            finally { _releaseLookupInProgress.Remove(key); }
+        }
         if (_overview.TryGetValue(key, out var info) && info.LatestRelease is { Assets.Count: > 0 })
             ShowRelease(key);
         else
@@ -586,7 +720,7 @@ public sealed partial class MainWindow : Window
     private void UpdateUpdates()
     {
         _updateRows.Clear();
-        foreach (SavedRepository repo in _repositories)
+        foreach (SavedRepository repo in VisibleRepositories())
         {
             string key = RepositoryKey(repo.Owner, repo.Name);
             if (_overview.TryGetValue(key, out var info) && info.LatestRelease is { } release && HasUpdate(key, release))
@@ -617,10 +751,13 @@ public sealed partial class MainWindow : Window
             ShowNotice("Не удалось обновить файл библиотеки.");
             return;
         }
-        _overview.Remove(key);
-        _syncErrors.Remove(key);
+        if (!_officialRepositories.Any(r => RepositoryKey(r.Owner, r.Name).Equals(key, StringComparison.OrdinalIgnoreCase)))
+        {
+            _overview.Remove(key);
+            _syncErrors.Remove(key);
+        }
         UpdateContent();
-        ShowNotice("Репозиторий убран из библиотеки. Скачанные файлы не удалены.");
+        ShowNotice("Пользовательский репозиторий убран. Скачанные файлы не удалены.");
     }
 
     private async void PickDownloadFolder_Click(object? sender, RoutedEventArgs e)
@@ -838,7 +975,7 @@ public sealed record AppSettings(string DownloadDirectory);
 public sealed record DownloadRecord(string RepositoryKey, long ReleaseId, string TagName,
     string FileName, string FilePath, DateTimeOffset DownloadedAt);
 public sealed record RepositoryCard(string Title, string RepositoryLabel, string Description,
-    string Symbol, string Badge, string ActionLabel, string RepositoryKey);
+    string Symbol, string Badge, string ActionLabel, string RepositoryKey, bool IsRemovable);
 public sealed record AssetRow(ReleaseAsset Asset, string Name, string SizeLabel);
 public sealed record DownloadRow(string FileName, string Detail, string FilePath);
 public sealed record UpdateRow(string RepositoryKey, string Name, string Detail);

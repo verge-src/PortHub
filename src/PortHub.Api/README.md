@@ -28,3 +28,10 @@ Configure `GITHUB_TOKEN` through your platform's protected environment-variable 
 - `GET /api/repos/{owner}/{repo}/overview` returns a public repo summary and latest stable published release, or 404 for private/missing repos
 
 The proxy rejects private repositories even if the PAT has access, filters downloaded asset URLs to github.com, caches successful results for 2 minutes, and rate-limits requests. The server never proxies arbitrary URLs, returns secret headers, or sends tokens to clients. For production, also configure edge rate limiting and request monitoring.
+
+## Automatic catalog
+
+
+## Global search endpoint (v1.0.1)
+
+`GET /api/search/repositories?q=<search text>&page=1` returns a paginated `GlobalSearchResponse` containing `items`, `totalCount`, `hasMore`, `incompleteResults`, and `page`. Omit `q` to get popular global public repositories. Never put the GitHub PAT in the URL or public code. Search has a 1000-result ceiling per query and is subject to the shared GitHub API search rate limit.

@@ -355,7 +355,7 @@
                               Stroke="#ACA9C5" StrokeThickness="1.6" StrokeLineCap="Round" />
                         <TextBox Grid.Column="1" x:Name="SearchInput"
                                  Classes="flat-search"
-                                 PlaceholderText="Поиск приложений..."
+                                 PlaceholderText="Поиск на GitHub..." MaxLength="80"
                                  TextChanged="SearchInput_TextChanged"
                                  FontSize="12" VerticalAlignment="Center" />
                         <Border Grid.Column="2" Classes="key-chip" Margin="4,0,0,0">
@@ -383,7 +383,7 @@
                            FontWeight="Bold" Margin="0,0,0,10"/>
                 <TextBlock Text="Добро пожаловать в PortHub" FontSize="31"
                            Foreground="#F4F1FC" FontWeight="Bold" Margin="0,0,0,7"/>
-                <TextBlock Text="Управляй портами, сборками и утилитами — быстро, удобно и в одном месте."
+                <TextBlock Text="Находи публичные проекты со всего GitHub, проверяй релизы и скачивай сборки."
                            Foreground="#ADA9BF" FontSize="13" Margin="0,0,0,24"/>
 
                 <!-- Hero banner with vector logo art, no web images or external fonts. -->
@@ -398,15 +398,15 @@
                   </Border.Background>
                   <Grid x:Name="HeroLayout" ColumnDefinitions="*,220" Margin="26,19,10,19">
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                      <TextBlock Text="Управляй своими портами&#10;из одного места"
+                      <TextBlock Text="GitHub-проекты&#10;в одном месте"
                                  FontSize="25" FontWeight="Bold" Foreground="#FFFFFF"
                                  TextWrapping="Wrap" LineHeight="31" Margin="0,0,0,10"/>
-                      <TextBlock Text="Добавляй репозитории, скачивай сборки, следи&#10;за обновлениями и держи проекты под контролем."
+                      <TextBlock Text="Ищи проекты по всему GitHub, проверяй&#10;релизы и загружай доступные файлы."
                                  Foreground="#C9C2E0" FontSize="12" TextWrapping="Wrap"
                                  Margin="0,0,0,18"/>
                       <StackPanel Orientation="Horizontal" Spacing="10">
                         <Button Classes="primary-action" Click="ShowAddRepository_Click">
-                          <TextBlock Text="+  Добавить репозиторий" FontSize="12" FontWeight="SemiBold"/>
+                          <TextBlock Text="+  Добавить в избранное" FontSize="12" FontWeight="SemiBold"/>
                         </Button>
                         <Button Classes="secondary-action" Click="OpenLibrary_Click">
                           <TextBlock Text="Открыть библиотеку" FontSize="12" FontWeight="SemiBold"/>
@@ -446,7 +446,7 @@
                 <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12" Margin="0,0,0,28">
                   <Border Classes="glass-card" Grid.Column="0" Height="88" Padding="16,12">
                     <StackPanel>
-                      <TextBlock Text="В библиотеке" FontSize="11" Foreground="#AFAABE"/>
+                      <TextBlock Text="Найдено на GitHub" FontSize="11" Foreground="#AFAABE"/>
                       <TextBlock x:Name="LibraryCountText" Text="0" FontSize="27"
                                  Foreground="#F7F5FF" FontWeight="Bold" Margin="0,2,0,0"/>
                     </StackPanel>
@@ -460,7 +460,7 @@
                   </Border>
                   <Border Classes="glass-card" Grid.Column="2" Height="88" Padding="16,12">
                     <StackPanel>
-                      <TextBlock Text="Доступно обновлений" FontSize="11" Foreground="#AFAABE"/>
+                      <TextBlock Text="Обновления в подборке" FontSize="11" Foreground="#AFAABE"/>
                       <TextBlock x:Name="UpdateCountText" Text="0" FontSize="27" Foreground="#F7F5FF"
                                  FontWeight="Bold" Margin="0,2,0,0"/>
                     </StackPanel>
@@ -470,7 +470,7 @@
                 <TextBlock x:Name="SyncStatusText" Text="" FontSize="11"
                            Foreground="#A9A1C1" Margin="0,0,0,13"/>
                 <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,15">
-                  <TextBlock Text="Репозитории" Foreground="#F0EDFA" FontSize="17"
+                  <TextBlock Text="Проекты и приложения" Foreground="#F0EDFA" FontSize="17"
                              FontWeight="SemiBold" VerticalAlignment="Center"/>
                   <Button Grid.Column="1" Classes="text-action" Click="OpenLibrary_Click"
                           Content="Все приложения  →"/>
@@ -520,7 +520,7 @@
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
                 <TextBlock x:Name="NoResultsText" IsVisible="False"
-                           Text="Библиотека пуста."
+                           Text="Ищем проекты GitHub…"
                            Foreground="#AFAABE" HorizontalAlignment="Center"
                            Margin="0,18,0,18"/>
 
@@ -532,14 +532,14 @@
                           HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
               <StackPanel Margin="34,57,34,40" Spacing="16">
                 <TextBlock Text="Библиотека" Foreground="#F4F1FC" FontSize="31" FontWeight="Bold"/>
-                <TextBlock Text="Публичные репозитории, которые ты добавил в PortHub."
+                <TextBlock Text="Поиск по всем публичным репозиториям GitHub. Избранные проекты сохраняются отдельно."
                            Foreground="#ADA9BF" FontSize="13"/>
                 <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
                   <TextBox x:Name="LibrarySearchInput" Grid.Column="0" Classes="flat-search"
                            Background="#5B1B1B30" BorderBrush="#554C4965" BorderThickness="1"
                            CornerRadius="10" Padding="12,10"
-                           PlaceholderText="Поиск репозиториев" TextChanged="SearchInput_TextChanged"/>
-                  <Button Grid.Column="1" Classes="secondary-action" Content="Обновить с GitHub"
+                           PlaceholderText="Поиск по всему GitHub" MaxLength="80" TextChanged="SearchInput_TextChanged"/>
+                  <Button Grid.Column="1" Classes="secondary-action" Content="Обновить каталог"
                           Click="RefreshRepositories_Click"/>
                   <Button Grid.Column="2" Classes="primary-action" Content="+ Добавить"
                           Click="ShowAddRepository_Click"/>
@@ -567,6 +567,7 @@
                               <Button Classes="primary-action" Content="{Binding ActionLabel}"
                                       Tag="{Binding RepositoryKey}" Click="RepositoryCard_Click"/>
                               <Button Classes="secondary-action" Content="Убрать"
+                                      IsVisible="{Binding IsRemovable}"
                                       Tag="{Binding RepositoryKey}" Click="LibraryRemove_Click"/>
                             </StackPanel>
                           </StackPanel>
@@ -575,6 +576,15 @@
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
+                <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center"
+                            VerticalAlignment="Center" Margin="0,5,0,0">
+                  <Button x:Name="CatalogPreviousButton" Classes="secondary-action" Content="← Назад"
+                          Click="CatalogPrevious_Click" IsEnabled="False" />
+                  <TextBlock x:Name="CatalogPageText" Text="Страница 1" Foreground="#B9B0C9"
+                             FontSize="12" VerticalAlignment="Center" />
+                  <Button x:Name="CatalogNextButton" Classes="secondary-action" Content="Вперёд →"
+                          Click="CatalogNext_Click" IsEnabled="False" />
+                </StackPanel>
                 <TextBlock x:Name="LibraryEmptyText" IsVisible="False" Foreground="#B9B0C9"
                            HorizontalAlignment="Center" TextWrapping="Wrap" Margin="0,22,0,0"/>
               </StackPanel>

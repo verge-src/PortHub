@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -14,6 +15,11 @@ internal sealed record GitHubRepository(string Owner, string Name, string FullNa
 public sealed record ReleaseAsset(long Id, string Name, long Size, Uri DownloadUrl);
 internal sealed record GitHubRelease(long Id, string TagName, Uri HtmlUrl, IReadOnlyList<ReleaseAsset> Assets);
 internal sealed record RepositoryOverview(GitHubRepository Repository, GitHubRelease? LatestRelease);
+internal sealed record CatalogEntry(RepositoryOverview Overview, bool ReleaseChecked);
+internal sealed record SearchCatalogPage(
+    IReadOnlyList<CatalogEntry> Items, int TotalCount, bool HasMore, bool IncompleteResults, int Page);
+internal sealed record SearchApiResponse(
+    IReadOnlyList<RepositoryOverview> Items, int TotalCount, bool HasMore, bool IncompleteResults, int Page);
 internal sealed record PortHubPublicConfiguration(string? ApiBaseUrl);
 
 internal sealed class GitHubApi
@@ -38,9 +44,9 @@ internal sealed class GitHubApi
     {
         var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = true })
         {
-            Timeout = TimeSpan.FromSeconds(30)
+            Timeout = TimeSpan.FromSeconds(100)
         };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("PortHub/0.1.8");
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("PortHub/1.0.0");
         return client;
     }
 
@@ -64,6 +70,84 @@ internal sealed class GitHubApi
         {
             throw new InvalidDataException("Некорректный porthub.config.json: " + ex.Message, ex);
         }
+    }
+
+    // Search ALL public GitHub repositories; no PAT is stored in the desktop application.
+    // The default (empty search) shows popular repositories, not a fake complete local index.
+    public async Task<SearchCatalogPage> SearchRepositoriesAsync(
+        string? search, int page, CancellationToken token = default)
+    {
+        string term = (search ?? "").Trim();
+        if (term.Length > 80 || page is < 1 or > 34)
+            throw new InvalidOperationException("Неверный поисковый запрос или номер страницы.");
+
+        if (_proxyBaseUrl is not null)
+        {
+            string endpoint = $"{_proxyBaseUrl}/api/search/repositories?q={Uri.EscapeDataString(term)}&page={page}";
+            using var response = await _api.GetAsync(endpoint, HttpCompletionOption.ResponseHeadersRead, token);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+                // Older deployments may lack this route: use public GitHub search temporarily.
+                return await SearchPublicGitHubAsync(term, page, token);
+            if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests)
+                throw new InvalidOperationException("Лимит поиска GitHub достигнут. Повтори запрос позднее.");
+            if (response.StatusCode == HttpStatusCode.BadRequest)
+                throw new InvalidOperationException("GitHub не принял запрос. Попробуй другие слова.");
+            if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException($"Поиск PortHub вернул HTTP {(int)response.StatusCode}.");
+            await using var stream = await response.Content.ReadAsStreamAsync(token);
+            var result = await JsonSerializer.DeserializeAsync<SearchApiResponse>(stream, JsonOptions, token)
+                ?? throw new JsonException("Некорректный ответ сервера PortHub.");
+            if (result.Items is null)
+                throw new JsonException("В ответе отсутствуют результаты поиска.");
+            var safe = result.Items.Where(item => item.Repository is not null
+                && item.Repository.HtmlUrl.Scheme == Uri.UriSchemeHttps
+                && item.Repository.HtmlUrl.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase))
+                .Select(item => new CatalogEntry(item, false)).ToArray();
+            return new SearchCatalogPage(safe, result.TotalCount, result.HasMore,
+                result.IncompleteResults, result.Page);
+        }
+
+        return await SearchPublicGitHubAsync(term, page, token);
+    }
+
+    private async Task<SearchCatalogPage> SearchPublicGitHubAsync(
+        string term, int page, CancellationToken token)
+    {
+        // Same search syntax as the server. GitHub Search API caps access at 1000 items.
+        string query = string.IsNullOrWhiteSpace(term)
+            ? "stars:>5000 archived:false fork:false is:public"
+            : $"{term} in:name,description archived:false fork:false is:public";
+        string url = $"https://api.github.com/search/repositories?q={Uri.EscapeDataString(query)}&per_page=30&page={page}"
+            + (string.IsNullOrWhiteSpace(term) ? "&sort=stars&order=desc" : "");
+        using JsonDocument? data = await FetchJsonAsync(url, false, token);
+        if (data is null || data.RootElement.ValueKind != JsonValueKind.Object)
+            throw new JsonException("GitHub вернул некорректные результаты поиска.");
+        JsonElement root = data.RootElement;
+        var results = new List<CatalogEntry>();
+        if (root.TryGetProperty("items", out var items) && items.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in items.EnumerateArray())
+            {
+                if (!item.TryGetProperty("private", out var privacy)
+                    || privacy.ValueKind != JsonValueKind.False) continue;
+                if (item.TryGetProperty("archived", out var archived) && archived.ValueKind == JsonValueKind.True)
+                    continue;
+                string owner = item.GetProperty("owner").GetProperty("login").GetString() ?? "";
+                string name = item.GetProperty("name").GetString() ?? "";
+                if (string.IsNullOrWhiteSpace(owner) || string.IsNullOrWhiteSpace(name)) continue;
+                string description = item.TryGetProperty("description", out var d)
+                    && d.ValueKind == JsonValueKind.String ? d.GetString() ?? "" : "";
+                var repo = new GitHubRepository(owner, name, $"{owner}/{name}", description,
+                    new Uri($"https://github.com/{Uri.EscapeDataString(owner)}/{Uri.EscapeDataString(name)}"));
+                results.Add(new CatalogEntry(new RepositoryOverview(repo, null), false));
+            }
+        }
+        int total = root.TryGetProperty("total_count", out var totalElement)
+            ? totalElement.GetInt32() : 0;
+        bool incomplete = root.TryGetProperty("incomplete_results", out var flag)
+            && flag.ValueKind == JsonValueKind.True;
+        bool next = results.Count > 0 && page < 34 && page * 30 < Math.Min(total, 1000);
+        return new SearchCatalogPage(results, total, next, incomplete, page);
     }
 
     public Task<RepositoryOverview> GetOverviewAsync(string owner, string name, CancellationToken token = default)
