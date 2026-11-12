@@ -1,4 +1,4 @@
-# PortHub v0.1.8 | Secure GitHub API
+# PortHub v1.0.0 | First public Windows release
 
 Real Avalonia Windows application + a separate ASP.NET Core backend for authenticated GitHub metadata. This version is based on the approved v0.1.7.2 design; MainWindow.axaml and MainWindow.axaml.cs are unchanged.
 
@@ -22,7 +22,7 @@ The PAT previously shared in a conversation must be treated as **exposed**: revo
 5. In `src/PortHub/porthub.config.json`, enter the **public HTTPS base URL** of your server as `ApiBaseUrl`, then build or publish the Windows application. Only the server URL goes into this file. The file is copied alongside the Windows executable.
 6. Publish and distribute the Windows app. Users get the public server URL, **never** the PAT.
 
-`porthub.config.json` starts with an empty `ApiBaseUrl` to avoid hardcoding an imaginary server. Until you provide a real deployed server URL, shared server-side authentication cannot be active, and public GitHub access stays functional without a token.
+For the public v1.0.0 Windows build, `porthub.config.json` contains the public HTTPS endpoint `https://porthub-api.onrender.com`. The URL is not a secret. The PAT remains only in Render's protected `GITHUB_TOKEN` setting.
 
 ## Local development
 
